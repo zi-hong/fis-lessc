@@ -1,0 +1,86 @@
+var execTool = require('child_process').exec,
+    fs = require('fs'),
+    p = require('path'),
+    path = fis.project.getTempPath() + '/www/static',
+    cwd = process.cwd() + '\\page',
+    allpaths = [],
+    orginPath = [];
+
+function makeCSSMap() {
+
+    getUrl(path, function(paths) {
+        
+        if (!paths || paths.length < 1) {
+            return;
+        }
+        allpaths = paths;
+        for (var i = 0; i < paths.length; i++) {
+            var fromPath = paths[i];
+            var toPath = path.replace(/\//g, '\\') + fromPath.replace(cwd, '');
+            orginPath.push(toPath);
+            moveFile(fromPath, toPath);
+        }
+        
+    });
+}
+
+/**是否已经完成文件复制**/
+function isOver(){
+
+    if(allpaths.length>0){
+        return;
+    }
+
+    for (var i = 0; i < orginPath.length; i++) {
+        exec(orginPath[i]);
+    }
+    
+}
+
+/*编译到本地环境 默认不产出源文件 所以需要复制
+ ******由于涉及产出目录与原目录不一致，会导致less中import文件找不到问题********
+ */
+function moveFile(fromPath, toPath) {
+    if (!fromPath || !toPath) {
+        return;
+    }
+
+    var str = 'copy /y ' + fromPath + ' ' + toPath.replace(/(.[^\\]+$)/, '');
+    //console.log(str);
+    execTool(str, function(error, stdout, stderr) {
+        if (error) {
+            console.log(toPath + '创建失败');
+        } else {
+            allpaths.splice(allpaths.indexOf(fromPath),1);
+            isOver();
+        }
+    })
+
+}
+
+/*执行lessc生成sourcemap，并重新生成css文件*/
+
+function exec(url) {
+
+    var str='lessc --relative-urls --source-map ' + url + '  ' + url.replace(/\.less/, ".css");
+    var lessc = execTool(str,function(error, stdout, stderr){
+        if (error) {
+            console.log(error);
+        }
+    });
+
+}
+
+/*在path目录下查找文件，并回调*/
+function getUrl(path, callback) {
+    var paths = [];
+    var str = "for /r " + cwd.replace(/\//g, '\\') + " %i in (*.less) do @echo %i";
+    execTool(str, function(error, stdout, stderr) {
+        if (error) {
+            console.log('exec error: ' + error);
+        } else {
+            callback(stdout.replace(/(^\s*)|(\s*$)/g,'').split(/\s+/));
+        }
+    });
+}
+exports.makeCSSMap = makeCSSMap;
